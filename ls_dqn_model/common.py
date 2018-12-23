@@ -81,7 +81,7 @@ def unpack_batch(batch):
            np.array(dones, dtype=np.uint8), np.array(last_states, copy=False)
 
 
-def calc_loss_dqn(batch, net, tgt_net, gamma, device="cpu"):
+def calc_loss_dqn(batch, net, tgt_net, gamma, device="cpu", double_dqn=False):
     states, actions, rewards, dones, next_states = unpack_batch(batch)
 
     states_v = torch.tensor(states).to(device)
@@ -91,7 +91,11 @@ def calc_loss_dqn(batch, net, tgt_net, gamma, device="cpu"):
     done_mask = torch.ByteTensor(dones).to(device)
 
     state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
-    next_state_values = tgt_net(next_states_v).max(1)[0]
+    if double_dqn:
+        next_state_actions = net(next_states_v).max(1)[1]
+        next_state_values = tgt_net(next_states_v).gather(1, next_state_actions.unsqueeze(-1)).squeeze(-1)
+    else:
+        next_state_values = tgt_net(next_states_v).max(1)[0]
     next_state_values[done_mask] = 0.0
 
     expected_state_action_values = next_state_values.detach() * gamma + rewards_v
