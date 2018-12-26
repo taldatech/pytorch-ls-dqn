@@ -11,7 +11,8 @@ from tensorboardX import SummaryWriter
 import ls_dqn_model.dqn_model as dqn_model
 import ls_dqn_model.common as common
 import ls_dqn_model.ptan as ptan
-
+import numpy as np
+import random
 
 def save_agent_state(net, optimizer, frame, games, epsilon):
     '''
@@ -69,7 +70,8 @@ def load_agent_state(net, optimizer, selector,  path=None, copy_to_target_networ
         print("No checkpoint found...")
 
 
-def calc_fqi_matrices(net, tgt_net, batch, gamma, n_srl, m_batch_size=512, device='cpu', use_dueling=False):
+def calc_fqi_matrices(net, tgt_net, batch, gamma, n_srl, m_batch_size=512, device='cpu', use_dueling=False,
+                      use_boosting=False):
     """
     This function calculates A and b tensors for the FQI solution.
     :param batch: batch of samples to extract features from (list)
@@ -80,6 +82,7 @@ def calc_fqi_matrices(net, tgt_net, batch, gamma, n_srl, m_batch_size=512, devic
     :param m_batch_size: number of samples to calculate simultaneously (int)
     :param device: on which device to perform the calculation (cpu/gpu)
     :param use_dueling: whether or not to use Dueling DQN architecture
+    :param use_boosting: whether or not to use Boosted FQI
     :return: A, A_bias, b, b_bias parameters for calculating the LS (np.arrays)
     """
     num_batches = n_srl // m_batch_size
@@ -119,9 +122,17 @@ def calc_fqi_matrices(net, tgt_net, batch, gamma, n_srl, m_batch_size=512, devic
         next_state_values = tgt_net(next_states_v).max(1)[0]
         next_state_values[done_mask] = 0.0
 
-        expected_state_action_values = next_state_values.detach() * gamma + rewards_v
-        b += torch.mm(torch.t(states_features_aug.detach()), expected_state_action_values.detach().view(-1, 1))
-        b_bias += torch.mm(torch.t(states_features_bias_aug), expected_state_action_values.detach().view(-1, 1))
+        expected_state_action_values = next_state_values.detach() * gamma + rewards_v  # y_i
+        if use_boosting:
+            state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
+            # calculate truncated bellman error
+            bellman_error = expected_state_action_values.detach() - state_action_values.detach()
+            truncated_bellman_error = bellman_error.clamp(-1, 1)
+            b += torch.mm(torch.t(states_features_aug.detach()), truncated_bellman_error.detach().view(-1, 1))
+            b_bias += torch.mm(torch.t(states_features_bias_aug), truncated_bellman_error.detach().view(-1, 1))
+        else:
+            b += torch.mm(torch.t(states_features_aug.detach()), expected_state_action_values.detach().view(-1, 1))
+            b_bias += torch.mm(torch.t(states_features_bias_aug), expected_state_action_values.detach().view(-1, 1))
         A += states_features_mat.detach()
         A_bias += states_features_bias_mat
     A = (1.0 / n_srl) * A
@@ -131,7 +142,7 @@ def calc_fqi_matrices(net, tgt_net, batch, gamma, n_srl, m_batch_size=512, devic
     return A, A_bias, b, b_bias
 
 
-def calc_fqi_w_srl(a, a_bias, b, b_bias, w, w_b, lam=1.0, device='cpu'):
+def calc_fqi_w_srl(a, a_bias, b, b_bias, w, w_b, lam=1.0, device='cpu', use_regularization=True):
     """
     This function calculates the closed-form solution of the DQI algorithm.
     :param a: A matrix built from features (np.array)
@@ -142,12 +153,15 @@ def calc_fqi_w_srl(a, a_bias, b, b_bias, w, w_b, lam=1.0, device='cpu'):
     :param w_b: bias weights
     :param lam: regularization parameter for the Least-Square (float)
     :param device: on which device to perform the calculation (cpu/gpu)
+    :param use_regularization: whether or not to use regularization
     :return: w_srl: retrained weights using FQI closed-form solution (np.array)
     """
     num_actions = w.shape[0]
     dim = w.shape[1]
     w = w.view(-1, 1)
     w_b = w_b.view(-1, 1)
+    if not use_regularization:
+        lam = 0
     w_srl = torch.mm(torch.inverse(a + lam * torch.eye(num_actions * dim).to(device)), b + lam * w.detach())
     w_b_srl = torch.mm(torch.inverse(a_bias + lam * torch.eye(num_actions * 1).to(device)), b_bias + lam * w_b.detach())
     return w_srl.view(num_actions, dim), w_b_srl.squeeze()
@@ -195,16 +209,37 @@ if __name__ == "__main__":
     env = gym.make(params['env_name'])
     env = ptan.common.wrappers.wrap_dqn(env)
 
+    training_random_seed = 10
     save_freq = 50000
     n_drl = 100000  # steps of DRL between SRL
     n_srl = params['replay_size']  # size of batch in SRL step
     use_double_dqn = False
     use_dueling_dqn = False
     use_ls_dqn = True
+    use_constant_seed = True  # to compare performance independently of the randomness
+
     lam = 1.0  # regularization parameter
     params['batch_size'] = 64
+    if use_ls_dqn:
+        model_name = "-LSDQN-LAM-" + str(lam) + "-" + str(int(1.0 * n_drl / 1000)) + "K"
+    else:
+        model_name = "-DQN"
+    model_name += "-BATCH-" + str(params['batch_size'])
+    if use_double_dqn:
+        model_name += "-DOUBLE"
+    if use_dueling_dqn:
+        model_name += "-DUELING"
+    if use_constant_seed:
+        model_name += "-SEED-" + str(training_random_seed)
+        np.random.seed(training_random_seed)
+        random.seed(training_random_seed)
+        env.seed(training_random_seed)
+        torch.manual_seed(training_random_seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(training_random_seed)
+        print("training using constant seed of ", training_random_seed)
 
-    writer = SummaryWriter(comment="-" + params['run_name'] + "-ls-dqn")
+    writer = SummaryWriter(comment="-" + params['run_name'] + model_name)
     if use_dueling_dqn:
         net = dqn_model.DuelingLSDQN(env.observation_space.shape, env.action_space.n).to(device)
     else:
