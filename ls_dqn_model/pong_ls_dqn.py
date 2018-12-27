@@ -183,7 +183,7 @@ def calc_fqi_w_srl(a, a_bias, b, b_bias, w, w_b, lam=1.0, device='cpu', use_regu
 
 
 def ls_step(net, tgt_net, batch, gamma, n_srl, lam=1.0, m_batch_size=256, device='cpu', use_dueling=False,
-            use_boosting=False, use_regularization=False):
+            use_boosting=False, use_regularization=True):
     """
     This function performs the least-squares update on the last hidden layer weights.
     :param batch: batch of samples to extract features from (list)
