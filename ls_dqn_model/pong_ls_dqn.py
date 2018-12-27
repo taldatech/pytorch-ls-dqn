@@ -14,22 +14,37 @@ import ls_dqn_model.ptan as ptan
 import numpy as np
 import random
 
-def save_agent_state(net, optimizer, frame, games, epsilon):
-    '''
+
+def save_agent_state(net, optimizer, frame, games, epsilon, save_replay=False, replay_buffer=None, name=''):
+    """
     This function saves the current state of the DQN (the weights) to a local file.
-    '''
-    filename = "pong_agent_ls_dqn.pth"
+    :param
+    """
+    if model_name:
+        filename = "pong_agent_ls_dqn_" + name + ".pth"
+    else:
+        filename = "pong_agent_ls_dqn.pth"
     dir_name = './pong_agent_ckpt'
     full_path = os.path.join(dir_name, filename)
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
-    torch.save({
-        'model_state_dict': net.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'frame_count': frame,
-        'games': games,
-        'epsilon': epsilon
-    }, full_path)
+    if save_replay and replay_buffer is not None:
+        torch.save({
+            'model_state_dict': net.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'frame_count': frame,
+            'games': games,
+            'epsilon': epsilon,
+            'replay_buffer': replay_buffer
+        }, full_path)
+    else:
+        torch.save({
+            'model_state_dict': net.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'frame_count': frame,
+            'games': games,
+            'epsilon': epsilon
+        }, full_path)
     print("Saved Pong Agent checkpoint @ ", full_path)
 
 
@@ -127,7 +142,7 @@ def calc_fqi_matrices(net, tgt_net, batch, gamma, n_srl, m_batch_size=512, devic
             state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
             # calculate truncated bellman error
             bellman_error = expected_state_action_values.detach() - state_action_values.detach()
-            truncated_bellman_error = bellman_error.clamp(-1, 1)
+            truncated_bellman_error = bellman_error.clamp(-1, 1)  # TODO: is this correct?
             b += torch.mm(torch.t(states_features_aug.detach()), truncated_bellman_error.detach().view(-1, 1))
             b_bias += torch.mm(torch.t(states_features_bias_aug), truncated_bellman_error.detach().view(-1, 1))
         else:
@@ -167,7 +182,8 @@ def calc_fqi_w_srl(a, a_bias, b, b_bias, w, w_b, lam=1.0, device='cpu', use_regu
     return w_srl.view(num_actions, dim), w_b_srl.squeeze()
 
 
-def ls_step(net, tgt_net, batch, gamma, n_srl, lam=1.0, m_batch_size=256, device='cpu', use_dueling=False):
+def ls_step(net, tgt_net, batch, gamma, n_srl, lam=1.0, m_batch_size=256, device='cpu', use_dueling=False,
+            use_boosting=False, use_regularization=False):
     """
     This function performs the least-squares update on the last hidden layer weights.
     :param batch: batch of samples to extract features from (list)
@@ -179,16 +195,20 @@ def ls_step(net, tgt_net, batch, gamma, n_srl, lam=1.0, m_batch_size=256, device
     :param m_batch_size: number of samples to calculate simultaneously (int)
     :param device: on which device to perform the calculation (cpu/gpu)
     :param use_dueling: whether or not to use Dueling DQN architecture
+    :param use_regularization: whether or not to use regularization
+    :param use_boosting: whether or not to use Boosted FQI
     :return:
     """
     a, a_bias, b, b_bias = calc_fqi_matrices(net, tgt_net, batch, gamma,
-                                             n_srl, m_batch_size=m_batch_size, device=device)
+                                             n_srl, m_batch_size=m_batch_size, device=device,
+                                             use_dueling=use_dueling, use_boosting=use_boosting)
     if use_dueling:
         w_last_dict = net.fc2_adv.state_dict()
     else:
         w_last_dict = net.fc2.state_dict()
     w_srl, w_b_srl = calc_fqi_w_srl(a.detach(), a_bias.detach(), b.detach(), b_bias.detach(),
-                                    w_last_dict['weight'], w_last_dict['bias'], lam=lam, device=device)
+                                    w_last_dict['weight'], w_last_dict['bias'], lam=lam, device=device,
+                                    use_regularization=use_regularization)
     w_last_dict['weight'] = w_srl.detach()
     w_last_dict['bias'] = w_b_srl.detach()
     if use_dueling:
@@ -215,20 +235,28 @@ if __name__ == "__main__":
     n_srl = params['replay_size']  # size of batch in SRL step
     use_double_dqn = False
     use_dueling_dqn = False
+    use_boosting = False
     use_ls_dqn = True
     use_constant_seed = True  # to compare performance independently of the randomness
+    save_for_analysis = False  # save also the replay buffer for later analysis
 
     lam = 1.0  # regularization parameter
     params['batch_size'] = 64
     if use_ls_dqn:
+        print("using ls-dqn with lambda:", str(lam))
         model_name = "-LSDQN-LAM-" + str(lam) + "-" + str(int(1.0 * n_drl / 1000)) + "K"
     else:
         model_name = "-DQN"
     model_name += "-BATCH-" + str(params['batch_size'])
     if use_double_dqn:
+        print("using double-dqn")
         model_name += "-DOUBLE"
     if use_dueling_dqn:
+        print("using dueling-dqn")
         model_name += "-DUELING"
+    if use_boosting:
+        print("using boosting")
+        model_name += "-BOOSTING"
     if use_constant_seed:
         model_name += "-SEED-" + str(training_random_seed)
         np.random.seed(training_random_seed)
@@ -269,7 +297,12 @@ if __name__ == "__main__":
             new_rewards = exp_source.pop_total_rewards()
             if new_rewards:
                 if reward_tracker.reward(new_rewards[0], frame_idx, selector.epsilon):
-                    save_agent_state(net, optimizer, frame_idx, len(reward_tracker.total_rewards), selector.epsilon)
+                    if save_for_analysis:
+                        temp_model_name = model_name + "_" + str(frame_idx)
+                        save_agent_state(net, optimizer, frame_idx, len(reward_tracker.total_rewards), selector.epsilon,
+                                         save_replay=True, replay_buffer=buffer.buffer, name=temp_model_name)
+                    else:
+                        save_agent_state(net, optimizer, frame_idx, len(reward_tracker.total_rewards), selector.epsilon)
                     break
 
             if len(buffer) < params['replay_initial']:
@@ -289,7 +322,7 @@ if __name__ == "__main__":
                 print("performing ls step...")
                 batch = buffer.sample(n_srl)
                 ls_step(net, tgt_net.target_model, batch, params['gamma'], len(batch), lam=lam,
-                        m_batch_size=256, device=device, use_dueling=use_dueling_dqn)
+                        m_batch_size=256, device=device, use_dueling=use_dueling_dqn, use_boosting=use_boosting)
                 # a, a_bias, b, b_bias = calc_fqi_matrices(net, tgt_net.target_model, batch, params['gamma'],
                 #                                          len(batch), m_batch_size=256, device=device)
                 # w_last_dict = net.fc2.state_dict()
@@ -302,4 +335,9 @@ if __name__ == "__main__":
             if frame_idx % params['target_net_sync'] == 0:
                 tgt_net.sync()
             if frame_idx % save_freq == 0:
-                save_agent_state(net, optimizer, frame_idx, len(reward_tracker.total_rewards), selector.epsilon)
+                if save_for_analysis and frame_idx % n_drl == 0:
+                    temp_model_name = model_name + "_" + str(frame_idx)
+                    save_agent_state(net, optimizer, frame_idx, len(reward_tracker.total_rewards), selector.epsilon,
+                                     save_replay=True, replay_buffer=buffer.buffer, name=temp_model_name)
+                else:
+                    save_agent_state(net, optimizer, frame_idx, len(reward_tracker.total_rewards), selector.epsilon)
