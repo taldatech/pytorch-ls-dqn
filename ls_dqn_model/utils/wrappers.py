@@ -1,4 +1,7 @@
-"""basic wrappers, useful for reinforcement learning on gym envs"""
+"""
+basic wrappers, useful for reinforcement learning on gym envs
+Most of the function are taken from the PyTorch Agent Net (PTAN) by Shmuma.
+PTAN: https://github.com/Shmuma/ptan"""
 # Mostly copy-pasted from https://github.com/openai/baselines/blob/master/baselines/common/atari_wrappers.py
 import numpy as np
 from collections import deque

@@ -1,3 +1,9 @@
+"""
+This file implements methods to pick an action by an agent.
+Most of the function are taken from the PyTorch Agent Net (PTAN) by Shmuma.
+PTAN: https://github.com/Shmuma/ptan
+"""
+
 import numpy as np
 
 

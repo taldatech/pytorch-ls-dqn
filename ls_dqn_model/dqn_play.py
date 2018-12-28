@@ -6,10 +6,10 @@ import numpy as np
 import os
 
 import torch
-import basic_model.dqn_model as dqn_model
-import basic_model.common as common
-import basic_model.ptan.common.wrappers as wrappers
-import basic_model.ptan as ptan
+import dqn_model as dqn_model
+import common as common
+import ptan.common.wrappers as wrappers
+import ptan as ptan
 
 import collections
 
