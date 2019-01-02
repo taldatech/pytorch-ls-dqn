@@ -20,12 +20,51 @@ import numpy as np
 import random
 import pickle
 
+"""
+DQN
+"""
 ckpt_list = ["./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_100000.pth",
              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_200000.pth",
              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_300000.pth",
              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_400000.pth",
              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_500000.pth",
              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_510229.pth"]
+
+"""
+DDQN
+"""
+# ckpt_list = ["./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-SEED-10_100000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-SEED-10_200000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-SEED-10_300000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-SEED-10_400000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-SEED-10_500000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-SEED-10_600000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-SEED-10_700000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-SEED-10_800000.pth"]
+
+"""
+Dueling DQN
+"""
+
+# ckpt_list = ["./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_100000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_200000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_300000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_400000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_500000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_517405.pth"]
+
+"""
+Dueling DDQN
+"""
+
+# ckpt_list = ["./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_100000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_200000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_300000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_400000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_500000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_561258.pth"]
+
+
 import copy
 
 if __name__ == "__main__":
@@ -41,17 +80,17 @@ if __name__ == "__main__":
     n_srl = params['replay_size']  # size of batch in SRL step
     use_double_dqn = False
     use_dueling_dqn = False
-    use_boosting = True
+    use_boosting = False
     use_ls_dqn = True
     use_constant_seed = True  # to compare performance independently of the randomness
-    save_for_analysis = False  # save also the replay buffer for later analysis
 
     # lam = 100.0  # regularization parameter
     if use_boosting:
-        # lams = [10000, 1000, 100, 10, 1]
-        lams = [10000]
+        lams = [10000, 1000, 100, 10, 1]
+        # lams = [10000]
     else:
-        lams = [100, 10, 1, 0.01, 0.001]
+        lams = [100, 10, 1, 0.1, 0.01]
+        # lams = [0.1]
     num_rollouts = 20  # number of episodes to evaluate the weights
     params['batch_size'] = 64
 
@@ -95,11 +134,10 @@ if __name__ == "__main__":
         exp_source = experience.ExperienceSourceFirstLast(env, agent, gamma=params['gamma'], steps_count=1)
         buffer = experience.ExperienceReplayBuffer(exp_source, buffer_size=params['replay_size'])
         optimizer = optim.Adam(net.parameters(), lr=params['learning_rate'])  # TODO: change to RMSprop
-
+        ckpt_dqn_rewards = []
+        ckpt_lsdqn_rewards = []
         for ckpt in ckpt_list:
             print("current checkpoint: ", ckpt)
-            ckpt_dqn_rewards = []
-            ckpt_lsdqn_rewards = []
             utils.load_agent_state(net, optimizer, selector, path=ckpt, copy_to_target_network=True,
                                    load_optimizer=False, target_net=tgt_net, buffer=buffer, load_buffer=True)
             total_reward = 0.0
