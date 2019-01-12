@@ -14,7 +14,7 @@ import torch.nn as nn
 import os
 
 
-def save_agent_state(net, optimizer, frame, games, epsilon, save_replay=False, replay_buffer=None, name=''):
+def save_agent_state(net, optimizer, frame, games, epsilon, save_replay=False, replay_buffer=None, name='', path=None):
     """
     This function saves the current state of the DQN (the weights) to a local file.
     :param net: the current DQN (nn.Module)
@@ -25,13 +25,17 @@ def save_agent_state(net, optimizer, frame, games, epsilon, save_replay=False, r
     :param save_replay: whether or not to save the replay buffer (bool)
     :param replay_buffer: the replay buffer (list)
     :param name: specific name for the checkpoint (str)
+    :param path: path to specific location where to save (str)
     """
-    if name:
-        filename = "pong_agent_ls_dqn_" + name + ".pth"
+    if path:
+        full_path = path
     else:
-        filename = "pong_agent_ls_dqn.pth"
-    dir_name = './pong_agent_ckpt'
-    full_path = os.path.join(dir_name, filename)
+        if name:
+            filename = "agent_ls_dqn_" + name + ".pth"
+        else:
+            filename = "agent_ls_dqn.pth"
+        dir_name = './agent_ckpt'
+        full_path = os.path.join(dir_name, filename)
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
     if save_replay and replay_buffer is not None:
@@ -51,11 +55,11 @@ def save_agent_state(net, optimizer, frame, games, epsilon, save_replay=False, r
             'games': games,
             'epsilon': epsilon
         }, full_path)
-    print("Saved Pong Agent checkpoint @ ", full_path)
+    print("Saved Agent checkpoint @ ", full_path)
 
 
 def load_agent_state(net, optimizer, selector, path=None, copy_to_target_network=False, load_optimizer=True,
-                     target_net=None, buffer=None, load_buffer=False):
+                     target_net=None, buffer=None, load_buffer=False, env_name='pong'):
     """
     This function loads a state of the DQN (the weights) from a local file.
     :param net: the current DQN (nn.Module)
@@ -67,11 +71,17 @@ def load_agent_state(net, optimizer, selector, path=None, copy_to_target_network
     :param load_buffer: whether or not to load the replay buffer (bool)
     :param buffer: the replay buffer
     :param target_net: the target DQN
+    :param env_name: environment name (str)
     """
     if path is None:
-        filename = "pong_agent_ls_dqn.pth"
-        dir_name = './pong_agent_ckpt'
-        full_path = os.path.join(dir_name, filename)
+        if env_name == 'pong':
+            filename = "pong_agent_ls_dqn.pth"
+            dir_name = './pong_agent_ckpt'
+            full_path = os.path.join(dir_name, filename)
+        else:
+            filename = "agent_ls_dqn.pth"
+            dir_name = './agent_ckpt'
+            full_path = os.path.join(dir_name, filename)
     else:
         full_path = path
     exists = os.path.isfile(full_path)

@@ -6,36 +6,41 @@ import numpy as np
 import os
 
 import torch
-import dqn_model as dqn_model
-import common as common
-import ptan.common.wrappers as wrappers
-import ptan as ptan
+import ls_dqn_model.utils.dqn_model as dqn_model
+import ls_dqn_model.utils.wrappers as wrappers
+from ls_dqn_model.utils.actions import ArgmaxActionSelector
+import ls_dqn_model.utils.utils as utils
+from ls_dqn_model.utils.agent import DQNAgent, TargetNet
 
 import collections
 
 DEFAULT_ENV_NAME = "PongNoFrameskip-v4"
+BOXING_ENV_NAME = "BoxingNoFrameskip-v4"
 FPS = 25
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # parser.add_argument("-m", "--model", required=True, help="Model file to load")
-    parser.add_argument("-e", "--env", default=DEFAULT_ENV_NAME,
+    parser.add_argument("-e", "--env", default=BOXING_ENV_NAME,
                         help="Environment name to use, default=" + DEFAULT_ENV_NAME)
     parser.add_argument("-r", "--record", help="Directory to store video recording")
     parser.add_argument("--no-visualize", default=True, action='store_false', dest='visualize',
                         help="Disable visualization of the game play")
     args = parser.parse_args()
-
+    use_dueling = True
     env = gym.make(args.env)
     env = wrappers.wrap_dqn(env)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     # env = wrappers.make_env(DEFAULT_ENV_NAME)
     if args.record:
         env = gym.wrappers.Monitor(env, args.record)
-    net = dqn_model.LSDQN(env.observation_space.shape, env.action_space.n).to(device)
+    if use_dueling:
+        net = dqn_model.DuelingLSDQN(env.observation_space.shape, env.action_space.n).to(device)
+    else:
+        net = dqn_model.LSDQN(env.observation_space.shape, env.action_space.n).to(device)
     # net.load_state_dict(torch.load(args.model, map_location=lambda storage, loc: storage))
-    path_to_model_ckpt = './pong_agent_ckpt/pong_agent.pth'
+    path_to_model_ckpt = './agent_ckpt/agent_ls_dqn_-boxing.pth'
     exists = os.path.isfile(path_to_model_ckpt)
     if exists:
         if not torch.cuda.is_available():
@@ -47,8 +52,8 @@ if __name__ == "__main__":
     else:
         raise SystemExit("Checkpoint File Not Found")
 
-    selector = ptan.actions.ArgmaxActionSelector()
-    agent = ptan.agent.DQNAgent(net, selector, device=device)
+    selector = ArgmaxActionSelector()
+    agent = DQNAgent(net, selector, device=device)
     state = env.reset()
     total_reward = 0.0
     c = collections.Counter()

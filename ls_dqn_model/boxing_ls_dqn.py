@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import gym
 # import argparse
 import torch
@@ -17,29 +16,25 @@ from ls_dqn_model.utils.srl_algorithms import ls_step
 import ls_dqn_model.utils.wrappers as wrappers
 import numpy as np
 import random
+import copy
 
 
 if __name__ == "__main__":
-    params = HYPERPARAMS['pong']
-#    params['epsilon_frames'] = 200000
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
-#     args = parser.parse_args()
-#     device = torch.device("cuda" if args.cuda else "cpu")
+    params = HYPERPARAMS['boxing']
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     env = gym.make(params['env_name'])
     env = wrappers.wrap_dqn(env)
 
     training_random_seed = 10
     save_freq = 50000
-    n_drl = 50000  # steps of DRL between SRL
+    n_drl = 500000  # steps of DRL between SRL
     n_srl = params['replay_size']  # size of batch in SRL step
     num_srl_updates = 3  # number of to SRL updates to perform
     use_double_dqn = True
-    use_dueling_dqn = True
+    use_dueling_dqn = False
     use_boosting = True
     use_ls_dqn = True
-    use_constant_seed = True  # to compare performance independently of the randomness
+    use_constant_seed = False  # to compare performance independently of the randomness
     save_for_analysis = False  # save also the replay buffer for later analysis
 
     lam = 1000  # regularization parameter
@@ -85,7 +80,8 @@ if __name__ == "__main__":
     buffer = experience.ExperienceReplayBuffer(exp_source, buffer_size=params['replay_size'])
     optimizer = optim.Adam(net.parameters(), lr=params['learning_rate'])  # TODO: change to RMSprop
 
-    utils.load_agent_state(net, optimizer, selector, load_optimizer=False)
+    utils.load_agent_state(net, optimizer, selector, load_optimizer=False, env_name='boxing',
+                           path='./agent_ckpt/agent_ls_dqn_-boxing.pth')
 
     frame_idx = 0
     drl_updates = 0
@@ -106,7 +102,7 @@ if __name__ == "__main__":
                                                name=temp_model_name)
                     else:
                         utils.save_agent_state(net, optimizer, frame_idx, len(reward_tracker.total_rewards),
-                                               selector.epsilon)
+                                               selector.epsilon, name='-boxing')
                     break
 
             if len(buffer) < params['replay_initial']:
@@ -122,20 +118,24 @@ if __name__ == "__main__":
 
             # LS-UPDATE STEP
             if use_ls_dqn and (drl_updates % n_drl == 0) and (len(buffer) >= n_srl):
-            # if (len(buffer) > 1):
                 print("performing ls step...")
+                if use_dueling_dqn:
+                    w_last_before = copy.deepcopy(net.fc2_adv.state_dict())
+                else:
+                    w_last_before = copy.deepcopy(net.fc2.state_dict())
                 batch = buffer.sample(n_srl)
                 ls_step(net, tgt_net.target_model, batch, params['gamma'], len(batch), lam=lam,
                         m_batch_size=256, device=device, use_dueling=use_dueling_dqn, use_boosting=use_boosting,
                         use_double_dqn=use_double_dqn)
-                # a, a_bias, b, b_bias = calc_fqi_matrices(net, tgt_net.target_model, batch, params['gamma'],
-                #                                          len(batch), m_batch_size=256, device=device)
-                # w_last_dict = net.fc2.state_dict()
-                # w_srl, w_b_srl = calc_fqi_w_srl(a.detach(), a_bias.detach(), b.detach(), b_bias.detach(),
-                #                                 w_last_dict['weight'], w_last_dict['bias'], lam=1.0, device=device)
-                # w_last_dict['weight'] = w_srl.detach()
-                # w_last_dict['bias'] = w_b_srl.detach()
-                # net.fc2.load_state_dict(w_last_dict)
+                # tgt_net.sync()
+                if use_dueling_dqn:
+                    w_last_after = net.fc2_adv.state_dict()
+                else:
+                    w_last_after = net.fc2.state_dict()
+                weight_diff = torch.sum((w_last_after['weight'] - w_last_before['weight']) ** 2)
+                bias_diff = torch.sum((w_last_after['bias'] - w_last_before['bias']) ** 2)
+                total_weight_diff = torch.sqrt(weight_diff + bias_diff)
+                print(frame_idx, ": total weight difference of ls-update: ", total_weight_diff.item())
 
             if frame_idx % params['target_net_sync'] == 0:
                 tgt_net.sync()
@@ -147,4 +147,4 @@ if __name__ == "__main__":
                                            name=temp_model_name)
                 else:
                     utils.save_agent_state(net, optimizer, frame_idx, len(reward_tracker.total_rewards),
-                                           selector.epsilon)
+                                           selector.epsilon, name="-boxing")

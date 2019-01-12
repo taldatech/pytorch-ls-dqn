@@ -106,4 +106,4 @@ class DuelingLSDQN(nn.Module):
     def forward_to_last_hidden(self, x):
         fx = x.float() / 256
         conv_out = self.conv(fx).view(fx.size()[0], -1)
-        return self.relu_adv(self.fc1_adv(conv_out))
+        return self.relu_adv(self.fc1_adv(conv_out)), self.relu_val(self.fc1_val(conv_out))

@@ -23,12 +23,12 @@ import pickle
 """
 DQN
 """
-ckpt_list = ["./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_100000.pth",
-             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_200000.pth",
-             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_300000.pth",
-             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_400000.pth",
-             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_500000.pth",
-             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_510229.pth"]
+# ckpt_list = ["./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_100000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_200000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_300000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_400000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_500000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_510229.pth"]
 
 """
 DDQN
@@ -57,12 +57,12 @@ Dueling DQN
 Dueling DDQN
 """
 
-# ckpt_list = ["./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_100000.pth",
-#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_200000.pth",
-#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_300000.pth",
-#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_400000.pth",
-#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_500000.pth",
-#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_561258.pth"]
+ckpt_list = ["./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_100000.pth",
+             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_200000.pth",
+             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_300000.pth",
+             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_400000.pth",
+             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_500000.pth",
+             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_561258.pth"]
 
 
 import copy
@@ -78,9 +78,9 @@ if __name__ == "__main__":
 
     training_random_seed = 10
     n_srl = params['replay_size']  # size of batch in SRL step
-    use_double_dqn = False
-    use_dueling_dqn = False
-    use_boosting = False
+    use_double_dqn = True
+    use_dueling_dqn = True
+    use_boosting = True
     use_ls_dqn = True
     use_constant_seed = True  # to compare performance independently of the randomness
 
