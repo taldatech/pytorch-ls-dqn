@@ -120,10 +120,9 @@ if __name__ == "__main__":
             # if use_ls_dqn and (drl_updates % n_drl == 0) and (len(buffer) >= n_srl):
             if use_ls_dqn and len(buffer) > 1:
                 print("performing ls step...")
-                print("performing ls step...")
                 batch = buffer.sample(n_srl)
                 if use_dueling_dqn:
-                    ls_step_dueling(net, tgt_net, batch, params['gamma'], len(batch), lam=lam, m_batch_size=256,
+                    ls_step_dueling(net, tgt_net.target_model, batch, params['gamma'], len(batch), lam=lam, m_batch_size=256,
                                     device=device,
                                     use_boosting=use_boosting, use_double_dqn=use_double_dqn)
                 else:

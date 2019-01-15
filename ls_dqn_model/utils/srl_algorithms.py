@@ -76,8 +76,9 @@ def ls_step_dueling(net, tgt_net, batch, gamma, n_srl, lam=1.0, m_batch_size=256
             position = actions_v[j] * dim
             states_features_adv_aug[j, position:position + dim] = states_features_adv.detach()[j, :]
             states_features_adv_bias_aug[j, actions_v[j]] = 1
-        states_features_adv_aug = states_features_adv_aug - states_features_adv_aug.mean(dim=1)
-        states_features_adv_bias_aug = states_features_adv_bias_aug.mean(dim=1)
+        states_features_adv_aug = states_features_adv_aug - states_features_adv_aug.mean(dim=1).unsqueeze(-1)
+        states_features_adv_bias_aug = states_features_adv_bias_aug - states_features_adv_bias_aug.mean(
+            dim=1).unsqueeze(-1)
         states_features_adv_mat = torch.mm(torch.t(states_features_adv_aug), states_features_adv_aug)
         states_features_val_mat = torch.mm(torch.t(states_features_val.detach()), states_features_val.detach())
         states_features_adv_bias_mat = torch.mm(torch.t(states_features_adv_bias_aug), states_features_adv_bias_aug)
@@ -193,10 +194,10 @@ def ls_step_dueling(net, tgt_net, batch, gamma, n_srl, lam=1.0, m_batch_size=256
             phi_vt_phi_v_bias_full + lam * torch.eye(phi_vt_phi_v_bias_full.shape[0]).to(device))),
                                        phi_vt_yi_bias_full) + lam * w_adv_bias_last)
 
-    A_val = torch.eye(dim).to(device) - torch.mm(torch.mm(phi_at_phi_v_full, torch.inverse(
-        phi_vt_phi_v_full + lam * torch.eye(phi_vt_phi_v_full.shape[0]).to(device))), phi_vt_phi_a_full)
-    A_val_bias = torch.eye(1 * 1).to(device) - torch.mm(torch.mm(phi_at_phi_v_bias_full, torch.inverse(
-        phi_vt_phi_v_bias_full + lam * torch.eye(phi_vt_phi_v_bias_full.shape[0]).to(device))), phi_vt_phi_a_bias_full)
+    A_val = torch.eye(dim).to(device) - torch.mm(torch.mm(phi_vt_phi_a_full, torch.inverse(
+        phi_at_phi_a_full + lam * torch.eye(phi_at_phi_a_full.shape[0]).to(device))), phi_at_phi_v_full)
+    A_val_bias = torch.eye(1 * 1).to(device) - torch.mm(torch.mm(phi_vt_phi_a_bias_full, torch.inverse(
+        phi_at_phi_a_bias_full + lam * torch.eye(phi_at_phi_a_bias_full.shape[0]).to(device))), phi_at_phi_v_bias_full)
 
     b_val = torch.mm(torch.inverse(phi_vt_phi_v_full + lam * torch.eye(phi_vt_phi_v_full.shape[0]).to(device)),
                      phi_vt_yi_full - torch.mm(torch.mm(phi_vt_phi_a_full, torch.inverse(

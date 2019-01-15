@@ -31,14 +31,14 @@ if __name__ == "__main__":
 
     training_random_seed = 10
     save_freq = 50000
-    n_drl = 50000  # steps of DRL between SRL
+    n_drl = 100000  # steps of DRL between SRL
     n_srl = params['replay_size']  # size of batch in SRL step
     num_srl_updates = 3  # number of to SRL updates to perform
-    use_double_dqn = True
+    use_double_dqn = False
     use_dueling_dqn = True
-    use_boosting = True
+    use_boosting = False
     use_ls_dqn = True
-    use_constant_seed = True  # to compare performance independently of the randomness
+    use_constant_seed = False  # to compare performance independently of the randomness
     save_for_analysis = False  # save also the replay buffer for later analysis
 
     lam = 1000  # regularization parameter
@@ -120,16 +120,17 @@ if __name__ == "__main__":
             drl_updates += 1
 
             # LS-UPDATE STEP
-            if use_ls_dqn and (drl_updates % n_drl == 0) and (len(buffer) >= n_srl):
-                # if (len(buffer) > 1):
+            # if use_ls_dqn and (drl_updates % n_drl == 0) and (len(buffer) >= n_srl):
+            if len(buffer) > 1:
                 print("performing ls step...")
                 batch = buffer.sample(n_srl)
                 if use_dueling_dqn:
-                    ls_step_dueling(net, tgt_net, batch, params['gamma'], len(batch), lam=lam, m_batch_size=256,
+                    ls_step_dueling(net, tgt_net.target_model, batch, params['gamma'], len(buffer), lam=lam,
+                                    m_batch_size=256,
                                     device=device,
                                     use_boosting=use_boosting, use_double_dqn=use_double_dqn)
                 else:
-                    ls_step(net, tgt_net.target_model, batch, params['gamma'], len(batch), lam=lam,
+                    ls_step(net, tgt_net.target_model, batch, params['gamma'], len(buffer), lam=lam,
                             m_batch_size=256, device=device, use_boosting=use_boosting,
                             use_double_dqn=use_double_dqn)
                 # a, a_bias, b, b_bias = calc_fqi_matrices(net, tgt_net.target_model, batch, params['gamma'],
