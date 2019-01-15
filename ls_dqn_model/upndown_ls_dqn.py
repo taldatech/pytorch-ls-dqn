@@ -12,7 +12,7 @@ from ls_dqn_model.utils.agent import DQNAgent, TargetNet
 from ls_dqn_model.utils.actions import EpsilonGreedyActionSelector
 import ls_dqn_model.utils.experience as experience
 import ls_dqn_model.utils.utils as utils
-from ls_dqn_model.utils.srl_algorithms import ls_step, ls_step_dueling
+from ls_dqn_model.utils.srl_algorithms import ls_step
 import ls_dqn_model.utils.wrappers as wrappers
 import numpy as np
 import random
@@ -20,7 +20,7 @@ import copy
 
 
 if __name__ == "__main__":
-    params = HYPERPARAMS['boxing']
+    params = HYPERPARAMS['upndown']
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     env = gym.make(params['env_name'])
     env = wrappers.wrap_dqn(env)
@@ -30,15 +30,15 @@ if __name__ == "__main__":
     n_drl = 500000  # steps of DRL between SRL
     n_srl = params['replay_size']  # size of batch in SRL step
     num_srl_updates = 3  # number of to SRL updates to perform
-    use_double_dqn = True
+    use_double_dqn = False
     use_dueling_dqn = True
     use_boosting = False
-    use_ls_dqn = True
+    use_ls_dqn = False
     use_constant_seed = False  # to compare performance independently of the randomness
     save_for_analysis = False  # save also the replay buffer for later analysis
 
-    lam = 100  # regularization parameter
-    params['batch_size'] = 64
+    lam = 10  # regularization parameter
+    # params['batch_size'] = 64
     if use_ls_dqn:
         print("using ls-dqn with lambda:", str(lam))
         model_name = "-LSDQN-LAM-" + str(lam) + "-" + str(int(1.0 * n_drl / 1000)) + "K"
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     optimizer = optim.Adam(net.parameters(), lr=params['learning_rate'])  # TODO: change to RMSprop
 
     utils.load_agent_state(net, optimizer, selector, load_optimizer=False, env_name='boxing',
-                           path='./agent_ckpt/agent_ls_dqn_-boxing.pth')
+                           path='./agent_ckpt/agent_ls_dqn_-upndown.pth')
 
     frame_idx = 0
     drl_updates = 0
@@ -102,7 +102,7 @@ if __name__ == "__main__":
                                                name=temp_model_name)
                     else:
                         utils.save_agent_state(net, optimizer, frame_idx, len(reward_tracker.total_rewards),
-                                               selector.epsilon, name='-boxing')
+                                               selector.epsilon, name='-upndown')
                     break
 
             if len(buffer) < params['replay_initial']:
@@ -117,19 +117,26 @@ if __name__ == "__main__":
             drl_updates += 1
 
             # LS-UPDATE STEP
-            # if use_ls_dqn and (drl_updates % n_drl == 0) and (len(buffer) >= n_srl):
-            if use_ls_dqn and len(buffer) > 1:
+            if use_ls_dqn and (drl_updates % n_drl == 0) and (len(buffer) >= n_srl):
+            # if use_ls_dqn and len(buffer) > 1:
                 print("performing ls step...")
-                print("performing ls step...")
-                batch = buffer.sample(n_srl)
                 if use_dueling_dqn:
-                    ls_step_dueling(net, tgt_net, batch, params['gamma'], len(batch), lam=lam, m_batch_size=256,
-                                    device=device,
-                                    use_boosting=use_boosting, use_double_dqn=use_double_dqn)
+                    w_last_before = copy.deepcopy(net.fc2_adv.state_dict())
                 else:
-                    ls_step(net, tgt_net.target_model, batch, params['gamma'], len(batch), lam=lam,
-                            m_batch_size=256, device=device, use_boosting=use_boosting,
-                            use_double_dqn=use_double_dqn)
+                    w_last_before = copy.deepcopy(net.fc2.state_dict())
+                batch = buffer.sample(n_srl)
+                ls_step(net, tgt_net.target_model, batch, params['gamma'], len(batch), lam=lam,
+                        m_batch_size=256, device=device, use_dueling=use_dueling_dqn, use_boosting=use_boosting,
+                        use_double_dqn=use_double_dqn)
+                # tgt_net.sync()
+                if use_dueling_dqn:
+                    w_last_after = net.fc2_adv.state_dict()
+                else:
+                    w_last_after = net.fc2.state_dict()
+                weight_diff = torch.sum((w_last_after['weight'] - w_last_before['weight']) ** 2)
+                bias_diff = torch.sum((w_last_after['bias'] - w_last_before['bias']) ** 2)
+                total_weight_diff = torch.sqrt(weight_diff + bias_diff)
+                print(frame_idx, ": total weight difference of ls-update: ", total_weight_diff.item())
 
             if frame_idx % params['target_net_sync'] == 0:
                 tgt_net.sync()
@@ -141,4 +148,4 @@ if __name__ == "__main__":
                                            name=temp_model_name)
                 else:
                     utils.save_agent_state(net, optimizer, frame_idx, len(reward_tracker.total_rewards),
-                                           selector.epsilon, name="-boxing")
+                                           selector.epsilon, name="-upndown")

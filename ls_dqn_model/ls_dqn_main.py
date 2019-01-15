@@ -12,7 +12,7 @@ from ls_dqn_model.utils.agent import DQNAgent, TargetNet
 from ls_dqn_model.utils.actions import EpsilonGreedyActionSelector, ArgmaxActionSelector
 import ls_dqn_model.utils.experience as experience
 import ls_dqn_model.utils.utils as utils
-from ls_dqn_model.utils.srl_algorithms import ls_step
+from ls_dqn_model.utils.srl_algorithms import ls_step, ls_step_dueling
 import ls_dqn_model.utils.wrappers as wrappers
 import numpy as np
 import random
@@ -220,23 +220,15 @@ if __name__ == "__main__":
                 # LS-UPDATE STEP
                 if use_ls_dqn and (drl_updates % n_drl == 0) and (len(buffer) >= n_srl):
                     print("performing ls step...")
-                    if use_dueling_dqn:
-                        w_last_before = copy.deepcopy(net.fc2_adv.state_dict())
-                    else:
-                        w_last_before = copy.deepcopy(net.fc2.state_dict())
                     batch = buffer.sample(n_srl)
-                    ls_step(net, tgt_net.target_model, batch, params['gamma'], len(batch), lam=lam,
-                            m_batch_size=256, device=device, use_dueling=use_dueling_dqn, use_boosting=use_boosting,
-                            use_double_dqn=use_double_dqn)
-                    # tgt_net.sync()
                     if use_dueling_dqn:
-                        w_last_after = net.fc2_adv.state_dict()
+                        ls_step_dueling(net, tgt_net, batch, params['gamma'], len(batch), lam=lam, m_batch_size=256,
+                                        device=device,
+                                        use_boosting=use_boosting, use_double_dqn=use_double_dqn)
                     else:
-                        w_last_after = net.fc2.state_dict()
-                    weight_diff = torch.sum((w_last_after['weight'] - w_last_before['weight']) ** 2)
-                    bias_diff = torch.sum((w_last_after['bias'] - w_last_before['bias']) ** 2)
-                    total_weight_diff = torch.sqrt(weight_diff + bias_diff)
-                    print(frame_idx, ": total weight difference of ls-update: ", total_weight_diff.item())
+                        ls_step(net, tgt_net.target_model, batch, params['gamma'], len(batch), lam=lam,
+                                m_batch_size=256, device=device, use_boosting=use_boosting,
+                                use_double_dqn=use_double_dqn)
 
                 if frame_idx % params['target_net_sync'] == 0:
                     tgt_net.sync()

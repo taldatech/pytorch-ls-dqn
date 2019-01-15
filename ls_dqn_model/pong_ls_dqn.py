@@ -13,19 +13,18 @@ from ls_dqn_model.utils.agent import DQNAgent, TargetNet
 from ls_dqn_model.utils.actions import EpsilonGreedyActionSelector
 import ls_dqn_model.utils.experience as experience
 import ls_dqn_model.utils.utils as utils
-from ls_dqn_model.utils.srl_algorithms import ls_step
+from ls_dqn_model.utils.srl_algorithms import ls_step, ls_step_dueling
 import ls_dqn_model.utils.wrappers as wrappers
 import numpy as np
 import random
 
-
 if __name__ == "__main__":
     params = HYPERPARAMS['pong']
-#    params['epsilon_frames'] = 200000
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
-#     args = parser.parse_args()
-#     device = torch.device("cuda" if args.cuda else "cpu")
+    #    params['epsilon_frames'] = 200000
+    #     parser = argparse.ArgumentParser()
+    #     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
+    #     args = parser.parse_args()
+    #     device = torch.device("cuda" if args.cuda else "cpu")
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     env = gym.make(params['env_name'])
     env = wrappers.wrap_dqn(env)
@@ -122,12 +121,17 @@ if __name__ == "__main__":
 
             # LS-UPDATE STEP
             if use_ls_dqn and (drl_updates % n_drl == 0) and (len(buffer) >= n_srl):
-            # if (len(buffer) > 1):
+                # if (len(buffer) > 1):
                 print("performing ls step...")
                 batch = buffer.sample(n_srl)
-                ls_step(net, tgt_net.target_model, batch, params['gamma'], len(batch), lam=lam,
-                        m_batch_size=256, device=device, use_dueling=use_dueling_dqn, use_boosting=use_boosting,
-                        use_double_dqn=use_double_dqn)
+                if use_dueling_dqn:
+                    ls_step_dueling(net, tgt_net, batch, params['gamma'], len(batch), lam=lam, m_batch_size=256,
+                                    device=device,
+                                    use_boosting=use_boosting, use_double_dqn=use_double_dqn)
+                else:
+                    ls_step(net, tgt_net.target_model, batch, params['gamma'], len(batch), lam=lam,
+                            m_batch_size=256, device=device, use_boosting=use_boosting,
+                            use_double_dqn=use_double_dqn)
                 # a, a_bias, b, b_bias = calc_fqi_matrices(net, tgt_net.target_model, batch, params['gamma'],
                 #                                          len(batch), m_batch_size=256, device=device)
                 # w_last_dict = net.fc2.state_dict()
