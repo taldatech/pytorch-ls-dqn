@@ -51,6 +51,7 @@ def ls_step_dueling(net, tgt_net, batch, gamma, n_srl, lam=1.0, m_batch_size=256
     phi_at_yi_bias_full = torch.zeros([1 * num_actions, 1], dtype=torch.float32).to(device)
     phi_vt_yi_full = torch.zeros([dim, 1], dtype=torch.float32).to(device)
     phi_vt_yi_bias_full = torch.zeros([1, 1], dtype=torch.float32).to(device)
+    # if using boosting: y_i = rho_i (the bellman residuals)
 
     for i in range(num_batches):
         idx = i * m_batch_size
@@ -91,6 +92,11 @@ def ls_step_dueling(net, tgt_net, batch, gamma, n_srl, lam=1.0, m_batch_size=256
         next_state_values[done_mask] = 0.0
 
         expected_state_action_values = next_state_values.detach() * gamma + rewards_v  # y_i
+        if use_boosting:
+            state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
+            # calculate truncated bellman error
+            bellman_error = expected_state_action_values.detach() - state_action_values.detach()
+            truncated_bellman_error = bellman_error.clamp(-1, 1)  # rho_i
 
         phi_vt_phi_a_full += torch.mm(torch.t(states_features_val.detach()), states_features_adv_aug)
         phi_vt_phi_a_bias_full += torch.mm(torch.t(states_features_val_bias.detach()), states_features_adv_bias_aug)
@@ -98,73 +104,24 @@ def ls_step_dueling(net, tgt_net, batch, gamma, n_srl, lam=1.0, m_batch_size=256
         phi_at_phi_a_bias_full += states_features_adv_bias_mat
         phi_vt_phi_v_full += states_features_val_mat
         phi_vt_phi_v_bias_full += states_features_val_bias_mat
-        phi_at_yi_full += torch.mm(torch.t(states_features_adv_aug), expected_state_action_values.detach().view(-1, 1))
-        phi_at_yi_bias_full += torch.mm(torch.t(states_features_adv_bias_aug),
-                                        expected_state_action_values.detach().view(-1, 1))
-        phi_vt_yi_full += torch.mm(torch.t(states_features_val.detach()),
-                                   expected_state_action_values.detach().view(-1, 1))
-        phi_vt_yi_bias_full += torch.mm(torch.t(states_features_val_bias.detach()),
-                                        expected_state_action_values.detach().view(-1, 1))
-
-        # phi_at_phi_v = torch.t(phi_vt_phi_a)
-
-        # A_val_tmp = torch.mm(phi_vt_phi_a, torch.mm(
-        #     torch.inverse(states_features_adv_mat + lam * torch.eye(states_features_adv_mat.shape[0])),
-        #     phi_at_phi_v))
-        # A_adv_tmp = torch.mm(phi_at_phi_v, torch.mm(
-        #     torch.inverse(states_features_val_mat + lam * torch.eye(states_features_val_mat.shape[0])),
-        #     phi_vt_phi_a))
-        # if use_boosting:
-        #     state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
-        #     # calculate truncated bellman error
-        #     bellman_error = expected_state_action_values.detach() - state_action_values.detach()
-        #     truncated_bellman_error = bellman_error.clamp(-1, 1)  # TODO: is this correct?
-        #
-        #     b_adv += torch.mm(torch.t(states_features_adv_aug.detach()),
-        #                       truncated_bellman_error.detach().view(-1, 1))
-        #     b_adv_bias += torch.mm(torch.t(states_features_adv_bias_aug),
-        #                            truncated_bellman_error.detach().view(-1, 1))
-        #
-        #     b_val += torch.mm(torch.t(states_features_val.detach()),
-        #                       truncated_bellman_error.detach().view(-1, 1))
-        #     b_val_bias += torch.mm(torch.t(states_features_val_bias),
-        #                            truncated_bellman_error.detach().view(-1, 1))
-        # else:
-        #     b_val_tmp = torch.mm(
-        #         torch.inverse(states_features_val_mat + lam * torch.eye(states_features_val_mat.shape[0])),
-        #         torch.mm(torch.t(states_features_val.detach()),
-        #                  expected_state_action_values.detach().view(-1, 1)) -
-        #         torch.mm(torch.mm(phi_vt_phi_a,
-        #                           torch.inverse(
-        #                               states_features_adv_mat.detach() + lam * torch.eye(
-        #                                   states_features_adv_mat.shape[
-        #                                       0]))),
-        #                  torch.mm(torch.t(
-        #                      states_features_adv_aug),
-        #                      expected_state_action_values.detach().view(
-        #                          -1, 1))))
-        #     b_adv_tmp = torch.mm(
-        #         torch.inverse(states_features_adv_mat + lam * torch.eye(states_features_adv_mat.shape[0])),
-        #         torch.mm(torch.t(states_features_adv_aug.detach()),
-        #                  expected_state_action_values.detach().view(-1, 1)) -
-        #         torch.mm(torch.mm(phi_at_phi_v,
-        #                           torch.inverse(
-        #                               states_features_val_mat.detach() + lam * torch.eye(
-        #                                   states_features_val_mat.shape[
-        #                                       0]))),
-        #                  torch.mm(torch.t(
-        #                      states_features_val),
-        #                      expected_state_action_values.detach().view(
-        #                          -1, 1))))
-        #     b_adv += torch.mm(torch.t(states_features_adv_aug.detach()),
-        #                       expected_state_action_values.detach().view(-1, 1))
-        #     b_adv_bias += torch.mm(torch.t(states_features_adv_bias_aug),
-        #                            expected_state_action_values.detach().view(-1, 1))
-        #
-        #     b_val += torch.mm(torch.t(states_features_val.detach()),
-        #                       expected_state_action_values.detach().view(-1, 1))
-        #     b_val_bias += torch.mm(torch.t(states_features_val_bias),
-        #                            expected_state_action_values.detach().view(-1, 1))
+        if use_boosting:
+            phi_at_yi_full += torch.mm(torch.t(states_features_adv_aug),
+                                       truncated_bellman_error.detach().view(-1, 1))
+            phi_at_yi_bias_full += torch.mm(torch.t(states_features_adv_bias_aug),
+                                            truncated_bellman_error.detach().view(-1, 1))
+            phi_vt_yi_full += torch.mm(torch.t(states_features_val.detach()),
+                                       truncated_bellman_error.detach().view(-1, 1))
+            phi_vt_yi_bias_full += torch.mm(torch.t(states_features_val_bias.detach()),
+                                            truncated_bellman_error.detach().view(-1, 1))
+        else:
+            phi_at_yi_full += torch.mm(torch.t(states_features_adv_aug),
+                                       expected_state_action_values.detach().view(-1, 1))
+            phi_at_yi_bias_full += torch.mm(torch.t(states_features_adv_bias_aug),
+                                            expected_state_action_values.detach().view(-1, 1))
+            phi_vt_yi_full += torch.mm(torch.t(states_features_val.detach()),
+                                       expected_state_action_values.detach().view(-1, 1))
+            phi_vt_yi_bias_full += torch.mm(torch.t(states_features_val_bias.detach()),
+                                            expected_state_action_values.detach().view(-1, 1))
 
     phi_vt_phi_a_full = (1.0 / n_srl) * phi_vt_phi_a_full
     phi_vt_phi_a_bias_full = (1.0 / n_srl) * phi_vt_phi_a_bias_full
@@ -213,13 +170,13 @@ def ls_step_dueling(net, tgt_net, batch, gamma, n_srl, lam=1.0, m_batch_size=256
     w_bias_adv_srl = torch.mm(torch.inverse(A_adv_bias), b_adv_bias).squeeze()
 
     w_val_srl = torch.mm(torch.inverse(A_val), b_val).view(1, dim)
-    w_bias_val_srl = torch.mm(torch.inverse(A_val_bias), b_val_bias).unsqueeze(-1)
+    w_bias_val_srl = torch.mm(torch.inverse(A_val_bias), b_val_bias).view(1)
 
     w_adv_last_dict['weight'] = w_adv_srl
     w_adv_last_dict['bias'] = w_bias_adv_srl
 
     w_val_last_dict['weight'] = w_val_srl
-    w_val_last_dict['bias'] = w_bias_val_srl.unsqueeze(-1)
+    w_val_last_dict['bias'] = w_bias_val_srl
 
     net.fc2_adv.load_state_dict(w_adv_last_dict)
     net.fc2_val.load_state_dict(w_val_last_dict)
@@ -295,7 +252,7 @@ def calc_fqi_matrices(net, tgt_net, batch, gamma, n_srl, m_batch_size=512, devic
             state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
             # calculate truncated bellman error
             bellman_error = expected_state_action_values.detach() - state_action_values.detach()
-            truncated_bellman_error = bellman_error.clamp(-1, 1)  # TODO: is this correct?
+            truncated_bellman_error = bellman_error.clamp(-1, 1)
             b += torch.mm(torch.t(states_features_aug.detach()), truncated_bellman_error.detach().view(-1, 1))
             b_bias += torch.mm(torch.t(states_features_bias_aug), truncated_bellman_error.detach().view(-1, 1))
         else:

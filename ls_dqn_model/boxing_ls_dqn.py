@@ -37,7 +37,7 @@ if __name__ == "__main__":
     use_constant_seed = False  # to compare performance independently of the randomness
     save_for_analysis = False  # save also the replay buffer for later analysis
 
-    lam = 100  # regularization parameter
+    lam = 1  # regularization parameter
     params['batch_size'] = 64
     if use_ls_dqn:
         print("using ls-dqn with lambda:", str(lam))
@@ -117,8 +117,8 @@ if __name__ == "__main__":
             drl_updates += 1
 
             # LS-UPDATE STEP
-            # if use_ls_dqn and (drl_updates % n_drl == 0) and (len(buffer) >= n_srl):
-            if use_ls_dqn and len(buffer) > 1:
+            if use_ls_dqn and (drl_updates % n_drl == 0) and (len(buffer) >= n_srl):
+            # if use_ls_dqn and len(buffer) > 1:
                 print("performing ls step...")
                 batch = buffer.sample(n_srl)
                 if use_dueling_dqn:
