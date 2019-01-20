@@ -17,6 +17,7 @@ from ls_dqn_model.utils.srl_algorithms import ls_step, ls_step_dueling
 import ls_dqn_model.utils.wrappers as wrappers
 import numpy as np
 import random
+import copy
 
 if __name__ == "__main__":
     params = HYPERPARAMS['pong']
@@ -26,9 +27,15 @@ if __name__ == "__main__":
     #     args = parser.parse_args()
     #     device = torch.device("cuda" if args.cuda else "cpu")
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    # conditional_update:
+    # if true, test the updated weights before replacing the old ones,
+    # if the new weights perform better, then replace them (bool)
+    conditional_update = False
     env = gym.make(params['env_name'])
     env = wrappers.wrap_dqn(env)
-
+    if conditional_update:
+        test_env = gym.make(params['env_name'])
+        test_env = wrappers.wrap_dqn(test_env)
     training_random_seed = 10
     save_freq = 50000
     n_drl = 100000  # steps of DRL between SRL
@@ -125,22 +132,56 @@ if __name__ == "__main__":
                 print("performing ls step...")
                 batch = buffer.sample(n_srl)
                 if use_dueling_dqn:
+                    if conditional_update:
+                        w_adv_last_dict_before = copy.deepcopy(net.fc2_adv.state_dict())
+                        w_val_last_dict_before = copy.deepcopy(net.fc2_val.state_dict())
                     ls_step_dueling(net, tgt_net.target_model, batch, params['gamma'], len(buffer), lam=lam,
                                     m_batch_size=256,
                                     device=device,
                                     use_boosting=use_boosting, use_double_dqn=use_double_dqn)
+                    if conditional_update:
+                        w_adv_last_dict_after = copy.deepcopy(net.fc2_adv.state_dict())
+                        w_val_last_dict_after = copy.deepcopy(net.fc2_val.state_dict())
+                        test_agent = copy.deepcopy(agent)
+                        # test original
+                        agent.dqn_model.fc2_adv.load_state_dict(w_adv_last_dict_before)
+                        agent.dqn_model.fc2_val.load_state_dict(w_val_last_dict_before)
+                        before_reward = utils.test_agent(test_env, test_agent)
+                        # test new
+                        agent.dqn_model.fc2_adv.load_state_dict(w_adv_last_dict_after)
+                        agent.dqn_model.fc2_val.load_state_dict(w_val_last_dict_after)
+                        after_reward = utils.test_agent(test_env, test_agent)
+                        print("average reward:: original: %.3f" % before_reward, " least-squares: %.3f" % after_reward)
+                        if after_reward > before_reward:
+                            net.fc2_adv.load_state_dict(w_adv_last_dict_after)
+                            net.fc2_val.load_state_dict(w_val_last_dict_after)
+                            print("using updated weights.")
+                        else:
+                            net.fc2_adv.load_state_dict(w_adv_last_dict_before)
+                            net.fc2_val.load_state_dict(w_val_last_dict_before)
+                            print("using original weights.")
                 else:
+                    if conditional_update:
+                        w_last_before = copy.deepcopy(net.fc2.state_dict())
                     ls_step(net, tgt_net.target_model, batch, params['gamma'], len(buffer), lam=lam,
                             m_batch_size=256, device=device, use_boosting=use_boosting,
                             use_double_dqn=use_double_dqn)
-                # a, a_bias, b, b_bias = calc_fqi_matrices(net, tgt_net.target_model, batch, params['gamma'],
-                #                                          len(batch), m_batch_size=256, device=device)
-                # w_last_dict = net.fc2.state_dict()
-                # w_srl, w_b_srl = calc_fqi_w_srl(a.detach(), a_bias.detach(), b.detach(), b_bias.detach(),
-                #                                 w_last_dict['weight'], w_last_dict['bias'], lam=1.0, device=device)
-                # w_last_dict['weight'] = w_srl.detach()
-                # w_last_dict['bias'] = w_b_srl.detach()
-                # net.fc2.load_state_dict(w_last_dict)
+                    if conditional_update:
+                        w_last_after = copy.deepcopy(net.fc2.state_dict())
+                        test_agent = copy.deepcopy(agent)
+                        # test original
+                        agent.dqn_model.fc2.load_state_dict(w_last_before)
+                        before_reward = utils.test_agent(test_env, test_agent)
+                        # test new
+                        agent.dqn_model.fc2.load_state_dict(w_last_after)
+                        after_reward = utils.test_agent(test_env, test_agent)
+                        print("average reward:: original: %.3f" % before_reward, " least-squares: %.3f" % after_reward)
+                        if after_reward > before_reward:
+                            net.fc2.load_state_dict(w_last_after)
+                            print("using updated weights.")
+                        else:
+                            net.fc2.load_state_dict(w_last_before)
+                            print("using original weights.")
 
             if frame_idx % params['target_net_sync'] == 0:
                 tgt_net.sync()

@@ -33,6 +33,8 @@ if __name__ == "__main__":
                         action="store_true")
     parser.add_argument("-f", "--dueling", help="use dueling dqn",
                         action="store_true")
+    parser.add_argument("-m", "--cond_update", help="conditional ls-update: update only if ls weights are better",
+                        action="store_true")
     parser.add_argument("-p", "--play", help="play the environment using an a pretrained agent",
                         action="store_true")
     parser.add_argument("-y", "--path", type=str, help="path to agent checkpoint, for playing")
@@ -64,6 +66,7 @@ if __name__ == "__main__":
                         help="number of steps before the agents starts learning, default: 10000")
     parser.add_argument("-c", "--target_update_freq", type=int,
                         help="number of steps between copying the weights to the target DQN, default: 10000")
+    # for playing
     parser.add_argument("-x", "--record", help="Directory to store video recording")
     parser.add_argument("--no-visualize", default=True, action='store_false', dest='visualize',
                         help="Disable visualization of the game play")
@@ -123,6 +126,14 @@ if __name__ == "__main__":
             params['replay_initial'] = args.steps_to_start_learn
         if args.target_update_freq:
             params['target_net_sync'] = args.target_update_freq
+        if args.cond_update:
+            conditional_update = True
+        else:
+            conditional_update = False
+
+        if conditional_update:
+            test_env = gym.make(params['env_name'])
+            test_env = wrappers.wrap_dqn(test_env)
 
         # training_random_seed = 10
         save_freq = 50000
@@ -222,13 +233,58 @@ if __name__ == "__main__":
                     print("performing ls step...")
                     batch = buffer.sample(n_srl)
                     if use_dueling_dqn:
-                        ls_step_dueling(net, tgt_net.target_model, batch, params['gamma'], len(batch), lam=lam, m_batch_size=256,
+                        if conditional_update:
+                            w_adv_last_dict_before = copy.deepcopy(net.fc2_adv.state_dict())
+                            w_val_last_dict_before = copy.deepcopy(net.fc2_val.state_dict())
+                        ls_step_dueling(net, tgt_net.target_model, batch, params['gamma'], len(batch), lam=lam,
+                                        m_batch_size=256,
                                         device=device,
                                         use_boosting=use_boosting, use_double_dqn=use_double_dqn)
+                        if conditional_update:
+                            w_adv_last_dict_after = copy.deepcopy(net.fc2_adv.state_dict())
+                            w_val_last_dict_after = copy.deepcopy(net.fc2_val.state_dict())
+                            test_agent = copy.deepcopy(agent)
+                            # test original
+                            agent.dqn_model.fc2_adv.load_state_dict(w_adv_last_dict_before)
+                            agent.dqn_model.fc2_val.load_state_dict(w_val_last_dict_before)
+                            before_reward = utils.test_agent(test_env, test_agent)
+                            # test new
+                            agent.dqn_model.fc2_adv.load_state_dict(w_adv_last_dict_after)
+                            agent.dqn_model.fc2_val.load_state_dict(w_val_last_dict_after)
+                            after_reward = utils.test_agent(test_env, test_agent)
+                            print("average reward:: original: %.3f" % before_reward,
+                                  " least-squares: %.3f" % after_reward)
+                            if after_reward > before_reward:
+                                net.fc2_adv.load_state_dict(w_adv_last_dict_after)
+                                net.fc2_val.load_state_dict(w_val_last_dict_after)
+                                print("using updated weights.")
+                            else:
+                                net.fc2_adv.load_state_dict(w_adv_last_dict_before)
+                                net.fc2_val.load_state_dict(w_val_last_dict_before)
+                                print("using original weights.")
                     else:
+                        if conditional_update:
+                            w_last_before = copy.deepcopy(net.fc2.state_dict())
                         ls_step(net, tgt_net.target_model, batch, params['gamma'], len(batch), lam=lam,
                                 m_batch_size=256, device=device, use_boosting=use_boosting,
                                 use_double_dqn=use_double_dqn)
+                        if conditional_update:
+                            w_last_after = copy.deepcopy(net.fc2.state_dict())
+                            test_agent = copy.deepcopy(agent)
+                            # test original
+                            agent.dqn_model.fc2.load_state_dict(w_last_before)
+                            before_reward = utils.test_agent(test_env, test_agent)
+                            # test new
+                            agent.dqn_model.fc2.load_state_dict(w_last_after)
+                            after_reward = utils.test_agent(test_env, test_agent)
+                            print("average reward:: original: %.3f" % before_reward,
+                                  " least-squares: %.3f" % after_reward)
+                            if after_reward > before_reward:
+                                net.fc2.load_state_dict(w_last_after)
+                                print("using updated weights.")
+                            else:
+                                net.fc2.load_state_dict(w_last_before)
+                                print("using original weights.")
 
                 if frame_idx % params['target_net_sync'] == 0:
                     tgt_net.sync()

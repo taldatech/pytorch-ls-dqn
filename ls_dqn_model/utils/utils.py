@@ -14,6 +14,29 @@ import torch.nn as nn
 import os
 
 
+def test_agent(env, agent, num_rollouts=20):
+    """
+    This function runs `num_rollouts` using the current agent's policy.
+    :param env: environment to test the agent in (gym.Env)
+    :param agent: Agent to predict actions (DQNAgent)
+    :param num_rollouts: number of episodes to play (int)
+    :return: average_reward: average reward from all the rollouts
+    """
+    total_reward = 0.0
+    for i in range(num_rollouts):
+        state = env.reset()
+        game_reward = 0.0
+        while True:
+            action, _ = agent([state])
+            state, reward, done, _ = env.step(action)
+            total_reward += reward
+            game_reward += reward
+            if done:
+                # print("dqn-game ", i, "reward: ", game_reward)
+                break
+    return 1.0 * total_reward / num_rollouts
+
+
 def save_agent_state(net, optimizer, frame, games, epsilon, save_replay=False, replay_buffer=None, name='', path=None):
     """
     This function saves the current state of the DQN (the weights) to a local file.

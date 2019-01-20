@@ -18,27 +18,33 @@ import numpy as np
 import random
 import copy
 
-
 if __name__ == "__main__":
     params = HYPERPARAMS['boxing']
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    # conditional_update:
+    # if true, test the updated weights before replacing the old ones,
+    # if the new weights perform better, then replace them (bool)
+    conditional_update = False
     env = gym.make(params['env_name'])
     env = wrappers.wrap_dqn(env)
+    if conditional_update:
+        test_env = gym.make(params['env_name'])
+        test_env = wrappers.wrap_dqn(test_env)
 
     training_random_seed = 10
     save_freq = 50000
-    n_drl = 500000  # steps of DRL between SRL
+    n_drl = 100000  # steps of DRL between SRL
     n_srl = params['replay_size']  # size of batch in SRL step
     num_srl_updates = 3  # number of to SRL updates to perform
-    use_double_dqn = True
+    use_double_dqn = False
     use_dueling_dqn = True
     use_boosting = False
-    use_ls_dqn = True
+    use_ls_dqn = False
     use_constant_seed = False  # to compare performance independently of the randomness
-    save_for_analysis = False  # save also the replay buffer for later analysis
+    save_for_analysis = True  # save also the replay buffer for later analysis
 
     lam = 1  # regularization parameter
-    params['batch_size'] = 64
+    params['batch_size'] = 32
     if use_ls_dqn:
         print("using ls-dqn with lambda:", str(lam))
         model_name = "-LSDQN-LAM-" + str(lam) + "-" + str(int(1.0 * n_drl / 1000)) + "K"
@@ -118,17 +124,60 @@ if __name__ == "__main__":
 
             # LS-UPDATE STEP
             if use_ls_dqn and (drl_updates % n_drl == 0) and (len(buffer) >= n_srl):
-            # if use_ls_dqn and len(buffer) > 1:
+                # if use_ls_dqn and len(buffer) > 1:
                 print("performing ls step...")
                 batch = buffer.sample(n_srl)
                 if use_dueling_dqn:
-                    ls_step_dueling(net, tgt_net.target_model, batch, params['gamma'], len(batch), lam=lam, m_batch_size=256,
+                    if conditional_update:
+                        w_adv_last_dict_before = copy.deepcopy(net.fc2_adv.state_dict())
+                        w_val_last_dict_before = copy.deepcopy(net.fc2_val.state_dict())
+                    ls_step_dueling(net, tgt_net.target_model, batch, params['gamma'], len(batch), lam=lam,
+                                    m_batch_size=256,
                                     device=device,
                                     use_boosting=use_boosting, use_double_dqn=use_double_dqn)
+                    if conditional_update:
+                        w_adv_last_dict_after = copy.deepcopy(net.fc2_adv.state_dict())
+                        w_val_last_dict_after = copy.deepcopy(net.fc2_val.state_dict())
+                        test_agent = copy.deepcopy(agent)
+                        # test original
+                        agent.dqn_model.fc2_adv.load_state_dict(w_adv_last_dict_before)
+                        agent.dqn_model.fc2_val.load_state_dict(w_val_last_dict_before)
+                        before_reward = utils.test_agent(test_env, test_agent)
+                        # test new
+                        agent.dqn_model.fc2_adv.load_state_dict(w_adv_last_dict_after)
+                        agent.dqn_model.fc2_val.load_state_dict(w_val_last_dict_after)
+                        after_reward = utils.test_agent(test_env, test_agent)
+                        print("average reward:: original: %.3f" % before_reward, " least-squares: %.3f" % after_reward)
+                        if after_reward > before_reward:
+                            net.fc2_adv.load_state_dict(w_adv_last_dict_after)
+                            net.fc2_val.load_state_dict(w_val_last_dict_after)
+                            print("using updated weights.")
+                        else:
+                            net.fc2_adv.load_state_dict(w_adv_last_dict_before)
+                            net.fc2_val.load_state_dict(w_val_last_dict_before)
+                            print("using original weights.")
                 else:
+                    if conditional_update:
+                        w_last_before = copy.deepcopy(net.fc2.state_dict())
                     ls_step(net, tgt_net.target_model, batch, params['gamma'], len(batch), lam=lam,
                             m_batch_size=256, device=device, use_boosting=use_boosting,
                             use_double_dqn=use_double_dqn)
+                    if conditional_update:
+                        w_last_after = copy.deepcopy(net.fc2.state_dict())
+                        test_agent = copy.deepcopy(agent)
+                        # test original
+                        agent.dqn_model.fc2.load_state_dict(w_last_before)
+                        before_reward = utils.test_agent(test_env, test_agent)
+                        # test new
+                        agent.dqn_model.fc2.load_state_dict(w_last_after)
+                        after_reward = utils.test_agent(test_env, test_agent)
+                        print("average reward:: original: %.3f" % before_reward, " least-squares: %.3f" % after_reward)
+                        if after_reward > before_reward:
+                            net.fc2.load_state_dict(w_last_after)
+                            print("using updated weights.")
+                        else:
+                            net.fc2.load_state_dict(w_last_before)
+                            print("using original weights.")
 
             if frame_idx % params['target_net_sync'] == 0:
                 tgt_net.sync()

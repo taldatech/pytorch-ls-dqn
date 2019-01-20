@@ -14,7 +14,7 @@ from ls_dqn_model.utils.agent import DQNAgent, TargetNet
 from ls_dqn_model.utils.actions import EpsilonGreedyActionSelector
 import ls_dqn_model.utils.experience as experience
 import ls_dqn_model.utils.utils as utils
-from ls_dqn_model.utils.srl_algorithms import ls_step
+from ls_dqn_model.utils.srl_algorithms import ls_step, ls_step_dueling
 import ls_dqn_model.utils.wrappers as wrappers
 import numpy as np
 import random
@@ -46,26 +46,24 @@ DDQN
 Dueling DQN
 """
 
-# ckpt_list = ["./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_100000.pth",
-#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_200000.pth",
-#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_300000.pth",
-#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_400000.pth",
-#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_500000.pth",
-#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_517405.pth"]
+ckpt_list = ["./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_100000.pth",
+             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_200000.pth",
+             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_300000.pth",
+             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_400000.pth",
+             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_500000.pth",
+             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DUELING-SEED-10_517405.pth"]
 
 """
 Dueling DDQN
 """
 
-ckpt_list = ["./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_100000.pth",
-             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_200000.pth",
-             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_300000.pth",
-             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_400000.pth",
-             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_500000.pth",
-             "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_561258.pth"]
+# ckpt_list = ["./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_100000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_200000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_300000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_400000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_500000.pth",
+#              "./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-DOUBLE-DUELING-SEED-10_561258.pth"]
 
-
-import copy
 
 if __name__ == "__main__":
     params = HYPERPARAMS['pong']
@@ -73,12 +71,11 @@ if __name__ == "__main__":
     env = gym.make(params['env_name'])
     env = wrappers.wrap_dqn(env)
 
-
     # ckpt_list = ["./pong_agent_ckpt/pong_agent_ls_dqn_-DQN-BATCH-64-SEED-10_300000.pth"]
 
     training_random_seed = 10
     n_srl = params['replay_size']  # size of batch in SRL step
-    use_double_dqn = True
+    use_double_dqn = False
     use_dueling_dqn = True
     use_boosting = True
     use_ls_dqn = True
@@ -154,23 +151,17 @@ if __name__ == "__main__":
                         break
             ckpt_dqn_rewards.append(1.0 * total_reward / num_rollouts)
             # retrain using ls-dqn
-            if use_dueling_dqn:
-                w_last_before = copy.deepcopy(net.fc2_adv.state_dict())
-            else:
-                w_last_before = copy.deepcopy(net.fc2.state_dict())
-            batch = buffer.sample(n_srl)
             print("performing ls step...")
-            ls_step(net, tgt_net.target_model, batch, params['gamma'], len(batch), lam=lam,
-                    m_batch_size=256, device=device, use_dueling=use_dueling_dqn, use_boosting=use_boosting,
-                    use_double_dqn=use_double_dqn)
+            batch = buffer.sample(n_srl)
             if use_dueling_dqn:
-                w_last_after = net.fc2_adv.state_dict()
+                ls_step_dueling(net, tgt_net.target_model, batch, params['gamma'], len(buffer), lam=lam,
+                                m_batch_size=256,
+                                device=device,
+                                use_boosting=use_boosting, use_double_dqn=use_double_dqn)
             else:
-                w_last_after = net.fc2.state_dict()
-            weight_diff = torch.sum((w_last_after['weight'] - w_last_before['weight']) ** 2)
-            bias_diff = torch.sum((w_last_after['bias'] - w_last_before['bias']) ** 2)
-            total_weight_diff = torch.sqrt(weight_diff + bias_diff)
-            print(ckpt.split('/')[-1], ": total weight difference of ls-update: ", total_weight_diff.item())
+                ls_step(net, tgt_net.target_model, batch, params['gamma'], len(buffer), lam=lam,
+                        m_batch_size=256, device=device, use_boosting=use_boosting,
+                        use_double_dqn=use_double_dqn)
             total_reward = 0.0
             for i in range(num_rollouts):
                 game_reward = 0.0
