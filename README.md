@@ -14,7 +14,13 @@ YouTube - not yet available
 ![boxing](https://github.com/taldatech/pytorch-ls-dqn/blob/master/images/boxing.gif)
 
 ## Background
-
+The idea of this algorithm is to combine between Deep RL (DRL) to Shallow RL (SRL), where in this case, we use Deep Q-Learning (DQN) as the DRL algorithm and
+Fitted Q-Iteration (FQI) as the SRL algorithm (which can be approximated using least-squares, full derivation is in the priginal paper).
+Every N_DRL (number of DQN backprop steps) we apply LS-UPDATE to the very last layer of the DQN, by using the complete Replay Buffer, a fetaure augmentation technique and
+Bayesian regularization (prevents overfitting, makes the LS matrix invertivle) to solve the FQI equations.
+The assumptions are that the features extracted from the last layer form a rich representation, and that the large batch size used by the SRL algorithm improves stability and performance.
+In this work we added the derivations and approximations for Dueling DQN architecture and also added Boosted FQI as an optional SRL algorithm.
+For full derivations and theory, please refer to the original paper.
 
 
 ## Prerequisites
@@ -73,7 +79,7 @@ You should use the `ls_dqn_main.py` file with the following arguments:
 |-i, --steps_to_start_learn| number of steps before the agents starts learning, default: 10000 |
 |-c, --target_update_freq| number of steps between copying the weights to the target DQN, default: 10000 |
 |-x, --record| Directory to store video recording when playing (only Linux) |
-|--no-visualize| if typed, render the environment when playing. default: True |
+|--no-visualize| if typed, render the environment when playing, default: True (does not visualize) |
 
 ## Playing
 Agents checkpoints (files ending with `.pth`) are saved and loaded from the `agent_ckpt` directory.
@@ -96,7 +102,7 @@ For full description of the flags, see the full API.
 
 ## Playing Atari on Windows
 
-You can train and play on a Windows machine, thanks to Nikita Kniazev, as follows from this post on [stackoverflow](https://stackoverflow.com/questions/42605769/openai-gym-atari-on-windows/46739299)
+You can train and play on a Windows machine, thanks to Nikita Kniazev, as follows from this post on [stackoverflow](https://stackoverflow.com/questions/42605769/openai-gym-atari-on-windows/46739299):
 
 `pip install --no-index -f https://github.com/Kojoley/atari-py/releases atari_py` 
 
