@@ -15,9 +15,9 @@ YouTube - not yet available
 
 ## Background
 The idea of this algorithm is to combine between Deep RL (DRL) to Shallow RL (SRL), where in this case, we use Deep Q-Learning (DQN) as the DRL algorithm and
-Fitted Q-Iteration (FQI) as the SRL algorithm (which can be approximated using least-squares, full derivation is in the priginal paper).
+Fitted Q-Iteration (FQI) as the SRL algorithm (which can be approximated using least-squares, full derivation is in the original paper).
 Every N_DRL (number of DQN backprop steps) we apply LS-UPDATE to the very last layer of the DQN, by using the complete Replay Buffer, a fetaure augmentation technique and
-Bayesian regularization (prevents overfitting, makes the LS matrix invertivle) to solve the FQI equations.
+Bayesian regularization (prevents overfitting, makes the LS matrix invertible) to solve the FQI equations.
 The assumptions are that the features extracted from the last layer form a rich representation, and that the large batch size used by the SRL algorithm improves stability and performance.
 In this work we added the derivations and approximations for Dueling DQN architecture and also added Boosted FQI as an optional SRL algorithm.
 For full derivations and theory, please refer to the original paper.
