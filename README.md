@@ -85,11 +85,11 @@ You should use the `ls_dqn_main.py` file with the following arguments:
 Agents checkpoints (files ending with `.pth`) are saved and loaded from the `agent_ckpt` directory.
 Playing a pretrained agent for one episode:
 
-`python ls_dqn_main.py --play -y ./agent_ckpt/pong_agent.pth --no-visualize`
+`python ls_dqn_main.py --play -e pong -y ./agent_ckpt/pong_agent.pth --no-visualize`
 
 If the checkpoint was trained using Dueling DQN:
 
-`python ls_dqn_main.py --play -f -y ./agent_ckpt/pong_agent.pth --no-visualize`
+`python ls_dqn_main.py --play -e pong -f -y ./agent_ckpt/pong_agent.pth --no-visualize`
 
 ## Training
 
