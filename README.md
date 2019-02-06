@@ -13,6 +13,17 @@ YouTube - not yet available
 ![pong](https://github.com/taldatech/pytorch-ls-dqn/blob/master/images/pong.gif)
 ![boxing](https://github.com/taldatech/pytorch-ls-dqn/blob/master/images/boxing.gif)
 
+- [pytorch-ls-dqn](#pytorch-ls-dqn)
+  * [Background](#background)
+  * [Prerequisites](#prerequisites)
+  * [Files in the repository](#files-in-the-repository)
+  * [API (`ls_dqn_main.py --help`)](#api---ls-dqn-mainpy---help--)
+  * [Playing](#playing)
+  * [Training](#training)
+  * [Playing Atari on Windows](#playing-atari-on-windows)
+  * [TensorBoard](#tensorboard)
+  * [References](#references)
+
 ## Background
 The idea of this algorithm is to combine between Deep RL (DRL) to Shallow RL (SRL), where in this case, we use Deep Q-Learning (DQN) as the DRL algorithm and
 Fitted Q-Iteration (FQI) as the SRL algorithm (which can be approximated using least-squares, full derivation is in the original paper).
@@ -105,6 +116,14 @@ For full description of the flags, see the full API.
 You can train and play on a Windows machine, thanks to Nikita Kniazev, as follows from this post on [stackoverflow](https://stackoverflow.com/questions/42605769/openai-gym-atari-on-windows/46739299):
 
 `pip install --no-index -f https://github.com/Kojoley/atari-py/releases atari_py` 
+
+## TensorBoard
+
+TensorBoard logs are written dynamically during the runs, and it possible to observe the training progress using the graphs. In order to open TensoBoard, navigate to the source directory of the project and in the terminal/cmd:
+
+`tensorboard --logdir=./runs`
+
+* make sure you have the correct environment activated (`conda activate env-name`) and that you have `tensorboard`, `tensorboardX` installed.
 
 ## References
 * [PyTorch Agent Net: reinforcement learning toolkit for pytorch](https://github.com/Shmuma/ptan) by [Max Lapan](https://github.com/Shmuma)
