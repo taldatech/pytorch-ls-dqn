@@ -9,7 +9,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-import ls_dqn_model.utils.actions
+import utils.actions
 
 
 class BaseAgent:

@@ -10,8 +10,7 @@ import random
 import collections
 import numpy as np
 from collections import namedtuple, deque
-from ls_dqn_model.utils.agent import BaseAgent
-
+from utils.agent import BaseAgent
 # one single experience step
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'done'])
 

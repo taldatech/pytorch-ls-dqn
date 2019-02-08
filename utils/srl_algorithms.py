@@ -5,7 +5,7 @@ Author: Tal Daniel
 
 # imports
 import torch
-import ls_dqn_model.utils.utils as utils
+import utils.utils as utils
 import copy
 
 

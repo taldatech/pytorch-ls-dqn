@@ -6,11 +6,11 @@ import numpy as np
 import os
 
 import torch
-import ls_dqn_model.utils.dqn_model as dqn_model
-import ls_dqn_model.utils.wrappers as wrappers
-from ls_dqn_model.utils.actions import ArgmaxActionSelector
-import ls_dqn_model.utils.utils as utils
-from ls_dqn_model.utils.agent import DQNAgent, TargetNet
+import utils.dqn_model as dqn_model
+import utils.wrappers as wrappers
+from utils.actions import ArgmaxActionSelector
+import utils.utils as utils
+from utils.agent import DQNAgent, TargetNet
 
 import collections
 

@@ -6,14 +6,14 @@ import os
 
 from tensorboardX import SummaryWriter
 
-import ls_dqn_model.utils.dqn_model as dqn_model
-from ls_dqn_model.utils.hyperparameters import HYPERPARAMS
-from ls_dqn_model.utils.agent import DQNAgent, TargetNet
-from ls_dqn_model.utils.actions import EpsilonGreedyActionSelector
-import ls_dqn_model.utils.experience as experience
-import ls_dqn_model.utils.utils as utils
-from ls_dqn_model.utils.srl_algorithms import ls_step, ls_step_dueling
-import ls_dqn_model.utils.wrappers as wrappers
+import utils.dqn_model as dqn_model
+from utils.hyperparameters import HYPERPARAMS
+from utils.agent import DQNAgent, TargetNet
+from utils.actions import EpsilonGreedyActionSelector
+import utils.experience as experience
+import utils.utils as utils
+from utils.srl_algorithms import ls_step, ls_step_dueling
+import utils.wrappers as wrappers
 import numpy as np
 import random
 import copy
