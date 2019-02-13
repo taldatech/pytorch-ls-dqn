@@ -7,7 +7,7 @@ Nir Levine, Tom Zahavy, Daniel J. Mankowitz, Aviv Tamar, Shie Mannor [Shallow Up
 
 Video:
 
-YouTube - not yet available
+[YouTube](https://youtu.be/i8Cnas7QrMc) - https://youtu.be/i8Cnas7QrMc
 
 
 ![pong](https://github.com/taldatech/pytorch-ls-dqn/blob/master/images/pong.gif)
@@ -61,6 +61,7 @@ For full derivations and theory, please refer to the original paper.
 |`utils.py`| utility functions|
 |`wrappers.py`| DeepMind's wrappers for the Atari environments|
 |`*.pth`| Checkpoint files for the Agents (playing/continual learning)|
+|`Deep_RL_Shallow_Updates_for_Deep_Reinforcement_Learning.pdf`| Writeup - theory and results|
 
 
 ## API (`ls_dqn_main.py --help`)
