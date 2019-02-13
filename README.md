@@ -13,6 +13,8 @@ Video:
 ![pong](https://github.com/taldatech/pytorch-ls-dqn/blob/master/images/pong.gif)
 ![boxing](https://github.com/taldatech/pytorch-ls-dqn/blob/master/images/boxing.gif)
 
+[LS-DDPG](https://github.com/taldatech/pytorch-ls-ddpg) - https://github.com/taldatech/pytorch-ls-ddpg
+
 - [pytorch-ls-dqn](#pytorch-ls-dqn)
   * [Background](#background)
   * [Prerequisites](#prerequisites)
@@ -79,6 +81,7 @@ You should use the `ls_dqn_main.py` file with the following arguments:
 |-j, --boosting| use Boosted-FQI as SRL algorithm, default: false |
 |-u, --double| use double dqn, default: false|
 |-f, --dueling| use dueling dqn, default: false |
+|-y, --path| path to agent checkpoint, for playing |
 |-m, --cond_update| conditional ls-update: update only if ls weights are better, default: false |
 |-e, --env| environment to play: pong, boxing, breakout, breakout-small, invaders |
 |-d, --decay_rate| number of episodes for epsilon decaying, default: 100000 |
@@ -91,17 +94,17 @@ You should use the `ls_dqn_main.py` file with the following arguments:
 |-i, --steps_to_start_learn| number of steps before the agents starts learning, default: 10000 |
 |-c, --target_update_freq| number of steps between copying the weights to the target DQN, default: 10000 |
 |-x, --record| Directory to store video recording when playing (only Linux) |
-|--no-visualize| if typed, render the environment when playing, default: True (does not visualize) |
+|--no-visualize| if not typed, render the environment when playing |
 
 ## Playing
 Agents checkpoints (files ending with `.pth`) are saved and loaded from the `agent_ckpt` directory.
 Playing a pretrained agent for one episode:
 
-`python ls_dqn_main.py --play -e pong -y ./agent_ckpt/pong_agent.pth --no-visualize`
+`python ls_dqn_main.py --play -e pong -y ./agent_ckpt/pong_agent.pth`
 
 If the checkpoint was trained using Dueling DQN:
 
-`python ls_dqn_main.py --play -e pong -f -y ./agent_ckpt/pong_agent.pth --no-visualize`
+`python ls_dqn_main.py --play -e pong -f -y ./agent_ckpt/pong_agent.pth`
 
 ## Training
 
